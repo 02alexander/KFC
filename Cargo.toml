@@ -1,12 +1,23 @@
 [package]
-name = "hello-pico"
-version = "0.1.0"
 edition = "2021"
+name = "kfc"
+version = "0.1.0"
 
+[dependencies]
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+embedded-hal = { version = "0.2.5", features = ["unproven"] }
 
-[workspace]
-members = [
-    "master",
-    "slave"
-]
+defmt = "0.3"
+defmt-rtt = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
 
+rp-pico = "0.7"
+
+embedded-alloc = "0.5.0"
+usb-device = "0.2.9"
+usbd-human-interface-device = {version = "0.4.3", features = ["defmt"]}
+fugit = "0.3.7"
+usbd-serial = "0.1.1"
+cfg-if = "1.0.0"
+bitvec = {version = "1.0.1", default-features = false, features = ["alloc"]}

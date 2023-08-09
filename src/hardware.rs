@@ -1,16 +1,20 @@
 #![warn(unsafe_op_in_unsafe_fn)]
 
+use rp_pico::entry;
 use embedded_alloc::Heap;
 
-// The heap allocator.
+// The rheap allocator.
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
 /// The entry point. Sets up the hardware.
-#[cortex_m_rt::entry]
+#[entry]
 fn entry() -> ! {
+    
     unsafe { init_heap() };
-    super::start();
+
+    // super::start();
+    loop {}
 }
 
 /// Initializes the heap using the symbols provided by memory.x.
@@ -25,16 +29,12 @@ unsafe fn init_heap() {
         let end = &mut _heap_end as *mut u32 as usize;
         assert!(end > start);
         HEAP.init(start, end - start);
+    
     }
-}
 
-/// Panic handler which prints the panic info to the serial device.
-#[panic_handler]
-fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-    serial::println!("{info}");
-    loop {
-        cortex_m::asm::wfi();
-    }
+
+
+    super::start();
 }
 
 /// Serial communication.
@@ -69,7 +69,7 @@ pub mod serial {
     /// # Safety
     ///
     /// May only be called once, and must be called before any of the other funcitons in this module.
-    pub(crate) unsafe fn start(
+    pub unsafe fn start(
         regs: USBCTRL_REGS,
         dpram: USBCTRL_DPRAM,
         clock: UsbClock,
