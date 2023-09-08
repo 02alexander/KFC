@@ -1,7 +1,11 @@
 #![warn(unsafe_op_in_unsafe_fn)]
 
-use rp_pico::entry;
+use core::panic::PanicInfo;
+
 use embedded_alloc::Heap;
+use rp_pico::entry;
+
+use self::serial::println;
 
 // The rheap allocator.
 #[global_allocator]
@@ -10,15 +14,13 @@ static HEAP: Heap = Heap::empty();
 /// The entry point. Sets up the hardware.
 #[entry]
 fn entry() -> ! {
-    
     unsafe { init_heap() };
 
-    // super::start();
-    loop {}
+    super::start()
 }
 
 /// Initializes the heap using the symbols provided by memory.x.
-unsafe fn init_heap() {
+pub unsafe fn init_heap() {
     extern "C" {
         static mut _heap_start: u32;
         static mut _heap_end: u32;
@@ -29,12 +31,14 @@ unsafe fn init_heap() {
         let end = &mut _heap_end as *mut u32 as usize;
         assert!(end > start);
         HEAP.init(start, end - start);
-    
     }
+}
 
-
-
-    super::start();
+#[panic_handler]
+fn panic_handler(info: &PanicInfo) -> ! {
+    loop {
+        println!("info {}", info);
+    }
 }
 
 /// Serial communication.
