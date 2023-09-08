@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use cortex_m::delay::Delay;
 use embedded_hal::{digital::v2::OutputPin, serial::Write, timer::CountDown};
 use fugit::{ExtU32, RateExtU32};
@@ -19,11 +20,14 @@ use bsp::{
     pac::Peripherals,
     Pins,
 };
+use usb_device::{class_prelude::UsbBusAllocator, prelude::{UsbDeviceBuilder, UsbVidPid}, UsbError};
+use usbd_human_interface_device::{usb_class::UsbHidClassBuilder, device::keyboard::NKROBootKeyboardConfig, UsbHidError};
 
 use crate::{
     buttonmatrix::ButtonMatrix,
     encoding::decode,
     hardware::{self, serial::println},
+    layout::KeyboardLogic, comms::ComLink,
 };
 
 #[rustfmt::skip]
@@ -93,30 +97,25 @@ pub fn run() -> ! {
         &mut pac.RESETS,
     );
 
-    cfg_if::cfg_if! {
-        if #[cfg(debug_assertions)] {
-            unsafe {
-                hardware::serial::start(pac.USBCTRL_REGS, pac.USBCTRL_DPRAM, clocks.usb_clock, &mut pac.RESETS);
-            }
-        } else {
-            let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
-                pac.USBCTRL_REGS,
-                pac.USBCTRL_DPRAM,
-                clocks.usb_clock,
-                true,
-                &mut pac.RESETS
-            ));
-            let mut keyboard = UsbHidClassBuilder::new()
-                .add_device(NKROBootKeyboardConfig::default())
-                .build(&usb_bus);
+    // unsafe {
+    //     hardware::serial::start(pac.USBCTRL_REGS, pac.USBCTRL_DPRAM, clocks.usb_clock, &mut pac.RESETS);
+    // }
+    let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
+        pac.USBCTRL_REGS,
+        pac.USBCTRL_DPRAM,
+        clocks.usb_clock,
+        true,
+        &mut pac.RESETS
+    ));
+    let mut keyboard = UsbHidClassBuilder::new()
+        .add_device(NKROBootKeyboardConfig::default())
+        .build(&usb_bus);
 
-            let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
-                .manufacturer("usbd-humane-interface-device")
-                .product("Custom Keyboard")
-                .serial_number("TEST")
-                .build();
-        }
-    }
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
+        .manufacturer("usbd-humane-interface-device")
+        .product("Custom Keyboard")
+        .serial_number("TEST")
+        .build();
 
     let mut rows = [
         DynPin::from(pins.gpio8),
@@ -156,8 +155,6 @@ pub fn run() -> ! {
     let mut scan_count_down = timer.count_down();
     scan_count_down.start(500.micros());
 
-    let mut test_count_down = timer.count_down();
-    test_count_down.start(10.millis());
 
     let mut led_on = false;
     let mut led_pin = pins.led.into_push_pull_output();
@@ -167,8 +164,14 @@ pub fn run() -> ! {
     delay.delay_ms(1000);
 
     let mut tot_pressed = [[false; 12]; 5];
-    let mut counter = 1;
     let mut prev_pressed: Option<[[bool; 12]; 5]> = None;
+
+    let mut kblogic = crate::layout::KeyboardLogic::new(&timer);
+
+    let mut slave_req = timer.count_down();
+    slave_req.start(15.millis());
+    let mut comms = ComLink::new(slave_req); 
+
     loop {
         if blink_count_down.wait().is_ok() {
             if led_on {
@@ -179,20 +182,17 @@ pub fn run() -> ! {
             led_on = !led_on;
         }
 
-        if test_count_down.wait().is_ok() {
-            uart.write(counter).unwrap();
-            let mut buffer = [0 as u8; 4];
-            if let Ok(_n) = uart.read_raw(&mut buffer) {
-                let mut pressed = [[false; 6]; 5];
-                decode(&buffer, &mut pressed);
-                for ri in 0..5 {
-                    for ci in 0..6 {
-                        tot_pressed[ri][11 - ci] = pressed[ri][ci];
-                    }
+        if let Some(buf) = comms.poll(&mut uart) {
+            let mut pressed = [[false; 6]; 5];
+            // println!("got {:?}", buf);
+            decode(buf, &mut pressed);
+            for ri in 0..5 {
+                for ci in 0..6 {
+                    tot_pressed[ri][6 + ci] = pressed[ri][ci];
                 }
             }
         }
-
+        
         if scan_count_down.wait().is_ok() {
             if let Some(pressed) = butmat.scan(&mut delay) {
                 if pressed[4][0] {
@@ -200,44 +200,48 @@ pub fn run() -> ! {
                 }
                 for ri in 0..5 {
                     for ci in 0..6 {
-                        tot_pressed[ri][ci] = pressed[ri][ci];
+                        tot_pressed[ri][5 - ci] = pressed[ri][ci];
                     }
                 }
-                if let Some(prev_pressed) = prev_pressed {
-                    for ri in 0..5 {
-                        for ci in 0..12 {
-                            if prev_pressed[ri][ci] && !tot_pressed[ri][ci] {
-                                println!("released {:?}", (ri, ci));
-                            } else if !prev_pressed[ri][ci] && tot_pressed[ri][ci] {
-                                println!("pressed {:?}", (ri, ci));
-                            }
-                        }
-                    }
-                }
-                prev_pressed = Some(tot_pressed);
+                let mut actions = Vec::with_capacity(8);
+                kblogic.update(&tot_pressed, &mut actions);
+                keyboard.device().write_report(actions).ok();
+                // while !actions.is_empty() {
+                //     let action = actions.pop();                
+                // }
+
+                // if let Some(prev_pressed) = prev_pressed {
+                //     for ri in 0..5 {
+                //         for ci in 0..12 {
+                //             if prev_pressed[ri][ci] && !tot_pressed[ri][ci] {
+                //                 println!("released {:?}", (ri, ci));
+                //             } else if !prev_pressed[ri][ci] && tot_pressed[ri][ci] {
+                //                 println!("pressed {:?}", (ri, ci));
+                //             }
+                //         }
+                //     }
+                // }
+                // prev_pressed = Some(tot_pressed);
             }
         }
 
-        #[cfg(not(debug_assertions))]
-        {
-            if tick_count_down.wait().is_ok() {
-                match keyboard.tick() {
-                    Err(UsbHidError::WouldBlock) => {}
-                    Ok(_) => {}
-                    Err(_) => {
-                        error!("Sending tick");
-                    }
+        if tick_count_down.wait().is_ok() {
+            match keyboard.tick() {
+                Err(UsbHidError::WouldBlock) => {}
+                Ok(_) => {}
+                Err(_) => {
+                    // error!("Sending tick");
                 }
             }
+        }
 
-            if usb_dev.poll(&mut [&mut keyboard]) {
-                match keyboard.device().read_report() {
-                    Err(UsbError::WouldBlock) => {}
-                    Err(_e) => {
-                        error!("Failed to read keyeboard report");
-                    }
-                    Ok(_leds) => {}
+        if usb_dev.poll(&mut [&mut keyboard]) {
+            match keyboard.device().read_report() {
+                Err(UsbError::WouldBlock) => {}
+                Err(_e) => {
+                    // error!("Failed to read keyeboard report");
                 }
+                Ok(_leds) => {}
             }
         }
     }

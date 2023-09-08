@@ -14,7 +14,7 @@ rp-pico = "0.7"
 
 embedded-alloc = "0.5.0"
 usb-device = "0.2.9"
-usbd-human-interface-device = {version = "0.4.3", features = ["defmt"]}
+usbd-human-interface-device = {version = "0.4.3"}
 fugit = "0.3.7"
 usbd-serial = "0.1.1"
 cfg-if = "1.0.0"

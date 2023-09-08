@@ -3,6 +3,7 @@
 
 extern crate alloc;
 mod buttonmatrix;
+mod comms;
 mod encoding;
 mod hardware;
 mod layout;
