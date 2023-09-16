@@ -161,7 +161,12 @@ pub fn run() -> ! {
     let mut blink_count_down = timer.count_down();
     blink_count_down.start(500.millis());
 
-    delay.delay_ms(1000);
+    for _ in 0..10 {
+        led_pin.set_high().unwrap();
+        delay.delay_ms(50);
+        led_pin.set_low().unwrap();
+        delay.delay_ms(50);
+    }
 
     let mut tot_pressed = [[false; 12]; 5];
     let mut prev_pressed: Option<[[bool; 12]; 5]> = None;
@@ -169,11 +174,20 @@ pub fn run() -> ! {
     let mut kblogic = crate::layout::KeyboardLogic::new(&timer);
 
     let mut slave_req = timer.count_down();
-    slave_req.start(15.millis());
+    slave_req.start(10.millis());
     let mut comms = ComLink::new(slave_req); 
+
+    let mut t_last_read = Some(0);
 
     loop {
         if blink_count_down.wait().is_ok() {
+            if let Some(tl) = t_last_read {
+                if timer.get_counter().ticks() - tl < 200_000 {
+                    blink_count_down.start(200.millis());
+                } else {
+                    blink_count_down.start(500.millis());
+                }
+            }
             if led_on {
                 led_pin.set_low().unwrap();
             } else {
@@ -182,6 +196,9 @@ pub fn run() -> ! {
             led_on = !led_on;
         }
 
+        if uart.uart_is_readable() {
+            t_last_read = Some(timer.get_counter().ticks());
+        }
         if let Some(buf) = comms.poll(&mut uart) {
             let mut pressed = [[false; 6]; 5];
             // println!("got {:?}", buf);

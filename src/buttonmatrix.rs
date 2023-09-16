@@ -44,7 +44,7 @@ where
         let col_pin = &mut self.butmat.cols[self.cur_col];
 
         row_pin.set_high().ok()?;
-        self.delay.delay_us(10);
+        self.delay.delay_us(1);
         if col_pin.is_high().ok()? {
             row_pin.set_low().ok()?;
             Some((self.cur_row, self.cur_col))
@@ -66,7 +66,7 @@ where
         for (ri, row_pin) in self.rows.iter_mut().enumerate() {
             for (ci, col_pin) in self.cols.iter_mut().enumerate() {
                 row_pin.set_high().ok()?;
-                delay.delay_us(10);
+                delay.delay_us(1);
 
                 if col_pin.is_high().ok()? {
                     pressed[ri][ci] = true;

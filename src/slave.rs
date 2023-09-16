@@ -22,7 +22,7 @@ use bsp::{
 use crate::{
     buttonmatrix::ButtonMatrix,
     encoding::encode,
-    hardware::{self},
+    hardware::{self, serial::println},
 };
 
 #[allow(unused)]
@@ -61,23 +61,6 @@ pub fn run() -> ! {
             unsafe {
                 hardware::serial::start(pac.USBCTRL_REGS, pac.USBCTRL_DPRAM, clocks.usb_clock, &mut pac.RESETS);
             }
-        } else {
-            let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
-                pac.USBCTRL_REGS,
-                pac.USBCTRL_DPRAM,
-                clocks.usb_clock,
-                true,
-                &mut pac.RESETS
-            ));
-            let mut keyboard = UsbHidClassBuilder::new()
-                .add_device(NKROBootKeyboardConfig::default())
-                .build(&usb_bus);
-
-            let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x1209, 0x0001))
-                .manufacturer("usbd-humane-interface-device")
-                .product("Custom Keyboard")
-                .serial_number("TEST")
-                .build();
         }
     }
 
@@ -104,6 +87,10 @@ pub fn run() -> ! {
 
     let mut butmat = ButtonMatrix { rows, cols };
 
+    // let mut p1 = pins.gpio12.into_push_pull_output();
+    // let mut p2 = pins.gpio13.into_push_pull_output();
+
+
     let uart_pins = (
         pins.gpio12
             .into_mode::<rp_pico::hal::gpio::pin::FunctionUart>(),
@@ -128,9 +115,18 @@ pub fn run() -> ! {
     let mut blink_count_down = timer.count_down();
     blink_count_down.start(500.millis());
 
+    let mut t_last_read = Some(0);
+
     let mut prev_pressed: Option<[[bool; 6]; 5]> = None;
     loop {
         if blink_count_down.wait().is_ok() {
+            if let Some(tl) = t_last_read {
+                if timer.get_counter().ticks() - tl < 200_000 {
+                    blink_count_down.start(200.millis());
+                } else {
+                    blink_count_down.start(500.millis());
+                }
+            }
             if led_on {
                 led_pin.set_low().unwrap();
             } else {
@@ -144,6 +140,7 @@ pub fn run() -> ! {
                 let encoded = encode(&cur_pressed);
                 uart.write_full_blocking(&encoded);
             }
+            t_last_read = Some(timer.get_counter().ticks());
         } else {
         }
 

@@ -3,7 +3,7 @@
 use core::panic::PanicInfo;
 
 use embedded_alloc::Heap;
-use rp_pico::entry;
+use rp_pico::{entry, hal::rom_data::reset_to_usb_boot};
 
 use self::serial::println;
 
@@ -37,7 +37,7 @@ pub unsafe fn init_heap() {
 #[panic_handler]
 fn panic_handler(info: &PanicInfo) -> ! {
     loop {
-        println!("info {}", info);
+        reset_to_usb_boot(0, 0);
     }
 }
 
