@@ -1,12 +1,9 @@
-use embedded_hal::{serial::{Read, Write}, timer::CountDown};
-use fugit::Duration;
-use rp_pico::hal::{
-    timer::{Instant},
-    uart::{Enabled, State, UartDevice, UartPeripheral, ValidUartPinout},
-    Timer,
+use embedded_hal::{
+    serial::{Read, Write},
+    timer::CountDown,
 };
+use rp_pico::hal::uart::{Enabled, UartDevice, UartPeripheral, ValidUartPinout};
 
-use crate::hardware::serial::println;
 
 pub struct ComLink<const N: usize, CD> {
     buffer: [u8; N],
@@ -15,8 +12,10 @@ pub struct ComLink<const N: usize, CD> {
     request_countdown: CD,
 }
 
-impl<'a, const N: usize, CD > ComLink<N, CD>
-where CD: CountDown {
+impl<'a, const N: usize, CD> ComLink<N, CD>
+where
+    CD: CountDown,
+{
     pub fn new(countdown: CD) -> Self {
         ComLink {
             buffer: [0; N],
@@ -26,21 +25,17 @@ where CD: CountDown {
         }
     }
 
-    pub fn poll<D, P>(
-        &mut self,
-        uart: &mut UartPeripheral<Enabled, D, P>,
-    ) -> Option<&[u8; N]>
+    pub fn poll<D, P>(&mut self, uart: &mut UartPeripheral<Enabled, D, P>) -> Option<&[u8; N]>
     where
         D: UartDevice,
         P: ValidUartPinout<D>,
     {
-
         if self.request_countdown.wait().is_ok() {
             if self.is_waiting {
                 // Clear input of leftover input.
                 let mut trash_bin = [0 as u8; 8];
                 uart.read_raw(&mut trash_bin).ok()?;
-                self.recvd = 0; 
+                self.recvd = 0;
             }
             uart.write(0).ok()?;
             self.is_waiting = true;
@@ -52,7 +47,7 @@ where CD: CountDown {
                 self.buffer[self.recvd] = byte;
                 self.recvd += 1;
             }
-    
+
             if self.recvd >= self.buffer.len() {
                 self.recvd = 0;
                 self.is_waiting = false;

@@ -18,7 +18,7 @@ usbd-human-interface-device = {version = "0.4.3"}
 fugit = "0.3.7"
 usbd-serial = "0.1.1"
 cfg-if = "1.0.0"
-bitvec = {version = "1.0.1", default-features = false, features = ["alloc"]}
+smallvec = "1.11.0"
 
 
 [features]

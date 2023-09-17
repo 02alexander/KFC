@@ -5,8 +5,6 @@ use core::panic::PanicInfo;
 use embedded_alloc::Heap;
 use rp_pico::{entry, hal::rom_data::reset_to_usb_boot};
 
-use self::serial::println;
-
 // The rheap allocator.
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
@@ -35,7 +33,7 @@ pub unsafe fn init_heap() {
 }
 
 #[panic_handler]
-fn panic_handler(info: &PanicInfo) -> ! {
+fn panic_handler(_info: &PanicInfo) -> ! {
     loop {
         reset_to_usb_boot(0, 0);
     }

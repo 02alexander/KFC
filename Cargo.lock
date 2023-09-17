@@ -245,7 +245,6 @@ dependencies = [
 name = "kfc"
 version = "0.1.0"
 dependencies = [
- "bitvec",
  "cfg-if",
  "cortex-m",
  "cortex-m-rt",
@@ -253,6 +252,7 @@ dependencies = [
  "embedded-hal",
  "fugit",
  "rp-pico",
+ "smallvec",
  "usb-device",
  "usbd-human-interface-device",
  "usbd-serial",
@@ -516,6 +516,12 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "smallvec"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 
 [[package]]
 name = "spin"

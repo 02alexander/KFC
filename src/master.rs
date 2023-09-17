@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use cortex_m::delay::Delay;
-use embedded_hal::{digital::v2::OutputPin, serial::Write, timer::CountDown};
+use embedded_hal::{digital::v2::OutputPin, timer::CountDown};
 use fugit::{ExtU32, RateExtU32};
 // use panic_probe as _;
 
@@ -20,51 +20,22 @@ use bsp::{
     pac::Peripherals,
     Pins,
 };
-use usb_device::{class_prelude::UsbBusAllocator, prelude::{UsbDeviceBuilder, UsbVidPid}, UsbError};
-use usbd_human_interface_device::{usb_class::UsbHidClassBuilder, device::keyboard::NKROBootKeyboardConfig, UsbHidError};
+use usb_device::{
+    class_prelude::UsbBusAllocator,
+    prelude::{UsbDeviceBuilder, UsbVidPid},
+    UsbError,
+};
+use usbd_human_interface_device::{
+    device::keyboard::NKROBootKeyboardConfig, usb_class::UsbHidClassBuilder, UsbHidError,
+};
 
 use crate::{
     buttonmatrix::ButtonMatrix,
+    comms::ComLink,
     encoding::decode,
     hardware::{self, serial::println},
-    layout::KeyboardLogic, comms::ComLink,
+    layout::KeyboardLogic,
 };
-
-#[rustfmt::skip]
-pub const LOGITECH_GAMING_KEYBOARD_REPORT_DESCRIPTOR: &[u8] = &[
-    0x05, 0x01, //    Usage Page (Generic Desktop)
-    0x09, 0x06, //    Usage (Keyboard)
-    0xA1, 0x01, //    Collection (Application)
-    0x05, 0x07, //        Usage Page (Keyboard/Keypad)
-    0x19, 0xE0, //        Usage Minimum (Keyboard Left Control)
-    0x29, 0xE7, //        Usage Maximum (Keyboard Right GUI)
-    0x15, 0x00, //        Logical Minimum (0)
-    0x25, 0x01, //        Logical Maximum (1)
-    0x75, 0x01, //        Report Size (1)
-    0x95, 0x08, //        Report Count (8)
-    0x81, 0x02, //        Input (Data,Var,Abs,NWrp,Lin,Pref,NNul,Bit)
-    0x95, 0x01, //        Report Count (1)
-    0x75, 0x08, //        Report Size (8)
-    0x81, 0x01, //        Input (Const,Ary,Abs)
-    0x95, 0x05, //        Report Count (5)
-    0x75, 0x01, //        Report Size (1)
-    0x05, 0x08, //        Usage Page (LEDs)
-    0x19, 0x01, //        Usage Minimum (Num Lock)
-    0x29, 0x05, //        Usage Maximum (Kana)
-    0x91, 0x02, //        Output (Data,Var,Abs,NWrp,Lin,Pref,NNul,NVol,Bit)
-    0x95, 0x01, //        Report Count (1)
-    0x75, 0x03, //        Report Size (3)
-    0x91, 0x01, //        Output (Const,Ary,Abs,NWrp,Lin,Pref,NNul,NVol,Bit)
-    0x95, 0x06, //        Report Count (6)
-    0x75, 0x08, //        Report Size (8)
-    0x15, 0x00, //        Logical Minimum (0)
-    0x26, 0x97, 0x00, //        Logical Maximum (151)
-    0x05, 0x07, //        Usage Page (Keyboard/Keypad)
-    0x19, 0x00, //        Usage Minimum (Undefined)
-    0x29, 0x97, //        Usage Maximum (Keyboard LANG8)
-    0x81, 0x00, //        Input (Data,Ary,Abs)
-    0xC0, //        End Collection
-];
 
 #[allow(unused)]
 pub fn run() -> ! {
@@ -105,7 +76,7 @@ pub fn run() -> ! {
         pac.USBCTRL_DPRAM,
         clocks.usb_clock,
         true,
-        &mut pac.RESETS
+        &mut pac.RESETS,
     ));
     let mut keyboard = UsbHidClassBuilder::new()
         .add_device(NKROBootKeyboardConfig::default())
@@ -155,27 +126,19 @@ pub fn run() -> ! {
     let mut scan_count_down = timer.count_down();
     scan_count_down.start(500.micros());
 
-
     let mut led_on = false;
     let mut led_pin = pins.led.into_push_pull_output();
     let mut blink_count_down = timer.count_down();
     blink_count_down.start(500.millis());
 
-    for _ in 0..10 {
-        led_pin.set_high().unwrap();
-        delay.delay_ms(50);
-        led_pin.set_low().unwrap();
-        delay.delay_ms(50);
-    }
-
     let mut tot_pressed = [[false; 12]; 5];
     let mut prev_pressed: Option<[[bool; 12]; 5]> = None;
 
-    let mut kblogic = crate::layout::KeyboardLogic::new(&timer);
+    let mut kblogic = KeyboardLogic::new(&timer);
 
     let mut slave_req = timer.count_down();
     slave_req.start(10.millis());
-    let mut comms = ComLink::new(slave_req); 
+    let mut comms = ComLink::new(slave_req);
 
     let mut t_last_read = Some(0);
 
@@ -209,10 +172,10 @@ pub fn run() -> ! {
                 }
             }
         }
-        
+
         if scan_count_down.wait().is_ok() {
             if let Some(pressed) = butmat.scan(&mut delay) {
-                if pressed[4][0] {
+                if pressed[4][0] && pressed[0][5] && pressed[0][0] {
                     reset_to_usb_boot(0, 0);
                 }
                 for ri in 0..5 {
@@ -220,11 +183,15 @@ pub fn run() -> ! {
                         tot_pressed[ri][5 - ci] = pressed[ri][ci];
                     }
                 }
+                let mut holds = Vec::with_capacity(8);
                 let mut actions = Vec::with_capacity(8);
-                kblogic.update(&tot_pressed, &mut actions);
-                keyboard.device().write_report(actions).ok();
+                kblogic.update(&tot_pressed, &timer, &mut holds, &mut actions);
+                for pressed in actions {
+
+                    keyboard.device().write_report(pressed.iter().copied().chain(holds.iter().copied())).ok();
+                }
                 // while !actions.is_empty() {
-                //     let action = actions.pop();                
+                //     let action = actions.pop();
                 // }
 
                 // if let Some(prev_pressed) = prev_pressed {

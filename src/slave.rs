@@ -90,7 +90,6 @@ pub fn run() -> ! {
     // let mut p1 = pins.gpio12.into_push_pull_output();
     // let mut p2 = pins.gpio13.into_push_pull_output();
 
-
     let uart_pins = (
         pins.gpio12
             .into_mode::<rp_pico::hal::gpio::pin::FunctionUart>(),
@@ -146,9 +145,10 @@ pub fn run() -> ! {
 
         if scan_count_down.wait().is_ok() {
             if let Some(pressed) = butmat.scan(&mut delay) {
-                if pressed[4][0] {
+                if pressed[4][0] && pressed[0][5] && pressed[0][0] {
                     reset_to_usb_boot(0, 0);
                 }
+
                 prev_pressed = Some(pressed);
             } else {
             }
