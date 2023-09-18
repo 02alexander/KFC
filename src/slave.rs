@@ -118,21 +118,21 @@ pub fn run() -> ! {
 
     let mut prev_pressed: Option<[[bool; 6]; 5]> = None;
     loop {
-        if blink_count_down.wait().is_ok() {
-            if let Some(tl) = t_last_read {
-                if timer.get_counter().ticks() - tl < 200_000 {
-                    blink_count_down.start(200.millis());
-                } else {
-                    blink_count_down.start(500.millis());
-                }
-            }
-            if led_on {
-                led_pin.set_low().unwrap();
-            } else {
-                led_pin.set_high().unwrap();
-            }
-            led_on = !led_on;
-        }
+        // if blink_count_down.wait().is_ok() {
+        //     if let Some(tl) = t_last_read {
+        //         if timer.get_counter().ticks() - tl < 200_000 {
+        //             blink_count_down.start(200.millis());
+        //         } else {
+        //             blink_count_down.start(500.millis());
+        //         }
+        //     }
+        //     if led_on {
+        //         led_pin.set_low().unwrap();
+        //     } else {
+        //         led_pin.set_high().unwrap();
+        //     }
+        //     led_on = !led_on;
+        // }
 
         if let Ok(_byte) = uart.read() {
             if let Some(cur_pressed) = prev_pressed {

@@ -143,21 +143,21 @@ pub fn run() -> ! {
     let mut t_last_read = Some(0);
 
     loop {
-        if blink_count_down.wait().is_ok() {
-            if let Some(tl) = t_last_read {
-                if timer.get_counter().ticks() - tl < 200_000 {
-                    blink_count_down.start(200.millis());
-                } else {
-                    blink_count_down.start(500.millis());
-                }
-            }
-            if led_on {
-                led_pin.set_low().unwrap();
-            } else {
-                led_pin.set_high().unwrap();
-            }
-            led_on = !led_on;
-        }
+        // if blink_count_down.wait().is_ok() {
+        //     if let Some(tl) = t_last_read {
+        //         if timer.get_counter().ticks() - tl < 200_000 {
+        //             blink_count_down.start(200.millis());
+        //         } else {
+        //             blink_count_down.start(500.millis());
+        //         }
+        //     }
+        //     if led_on {
+        //         led_pin.set_low().unwrap();
+        //     } else {
+        //         led_pin.set_high().unwrap();
+        //     }
+        //     led_on = !led_on;
+        // }
 
         if uart.uart_is_readable() {
             t_last_read = Some(timer.get_counter().ticks());
