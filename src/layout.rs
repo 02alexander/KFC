@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
-use rp_pico::hal::{timer::Instant, Timer, pwm::B};
+use rp_pico::hal::{timer::Instant, Timer};
 use smallvec::SmallVec;
 use usbd_human_interface_device::page::Keyboard;
-
 
 use self::layout::LAYOUT;
 
@@ -13,7 +12,7 @@ const COLS: usize = 12;
 pub enum Key {
     Press(Keyboard),
     LayerChange(u8),
-    OnClick(Keyboard, Keyboard, u64), 
+    OnClick(Keyboard, Keyboard, u64),
     Combo(Keyboard, Keyboard),
     Hold(Keyboard),
     Drop,
@@ -26,9 +25,9 @@ mod layout {
     use super::Key::Press as PR;
     use super::Key::{self, Drop, Empty, Hold, LayerChange, OnClick};
     // use usbd_human_interface_edvice::page::Keyboard;
-    use usbd_human_interface_device::page::Keyboard::*;
-    use usbd_human_interface_device::page::Keyboard::LeftShift as LS;
     use super::Key::Combo as CB;
+    use usbd_human_interface_device::page::Keyboard::LeftShift as LS;
+    use usbd_human_interface_device::page::Keyboard::*;
 
     const Exclamation: Key = CB(LS, Keyboard1);
     const At: Key = CB(LS, Keyboard2);
@@ -90,6 +89,7 @@ pub struct ButtonState {
 
 pub struct KeyboardLogic {
     prev_pressed: [[ButtonState; COLS]; ROWS],
+    t_last_key_sent: Instant,
 }
 
 impl KeyboardLogic {
@@ -101,6 +101,7 @@ impl KeyboardLogic {
                 t_change: t,
                 pressed_layer: 0,
             }; COLS]; ROWS],
+            t_last_key_sent: t,
         }
     }
 
@@ -144,7 +145,7 @@ impl KeyboardLogic {
                 let cur_pressed = new_state[ri][ci];
                 let prev_button_state = &mut self.prev_pressed[ri][ci];
                 let t = timer.get_counter();
-                
+
                 // So that if the layer is changed while any key is pressed it won't automatically
                 // press the corresponding key in the new layer.
                 if cur_pressed != prev_button_state.pressed {
@@ -154,9 +155,9 @@ impl KeyboardLogic {
                 if prev_button_state.pressed_layer == used_layer[ri][ci] {
                     match LAYOUT[used_layer[ri][ci] as usize][ri][ci] {
                         Key::Press(key) => {
-    
                             if cur_pressed {
                                 normal_presses.push(key);
+                                self.t_last_key_sent = t;
                             }
                         }
                         Key::Combo(k1, k2) => {
@@ -165,6 +166,7 @@ impl KeyboardLogic {
                                 sv.push(k1);
                                 sv.push(k2);
                                 actions.push(sv);
+                                self.t_last_key_sent = t;
                             }
                         }
                         Key::Empty => {}
@@ -176,13 +178,19 @@ impl KeyboardLogic {
                         Key::OnClick(click_key, hold_mod, ms) => {
                             if cur_pressed {
                                 holds.push(hold_mod);
-                            } else if !cur_pressed && prev_button_state.pressed && (t-prev_button_state.t_change).ticks() < ms*1000 {
+                            } else if !cur_pressed
+                                && prev_button_state.pressed
+                                && (t - prev_button_state.t_change).ticks() < ms * 1000
+                                && prev_button_state.t_change.ticks()
+                                    >= self.t_last_key_sent.ticks()
+                            {
                                 normal_presses.push(click_key);
+                                self.t_last_key_sent = t;
                             }
                         }
                         Key::Drop => {}
                         Key::LayerChange(_) => {}
-                    }   
+                    }
                 }
                 if cur_pressed != prev_button_state.pressed {
                     prev_button_state.t_change = t;

@@ -1,5 +1,5 @@
 use cortex_m::delay::Delay;
-use embedded_hal::{digital::v2::OutputPin, serial::Read, timer::CountDown};
+use embedded_hal::{serial::Read, timer::CountDown};
 use fugit::{ExtU32, RateExtU32};
 
 use rp_pico as bsp;
@@ -22,7 +22,7 @@ use bsp::{
 use crate::{
     buttonmatrix::ButtonMatrix,
     encoding::encode,
-    hardware::{self, serial::println},
+    hardware::{self},
 };
 
 #[allow(unused)]
@@ -140,7 +140,6 @@ pub fn run() -> ! {
                 uart.write_full_blocking(&encoded);
             }
             t_last_read = Some(timer.get_counter().ticks());
-        } else {
         }
 
         if scan_count_down.wait().is_ok() {
@@ -150,7 +149,6 @@ pub fn run() -> ! {
                 }
 
                 prev_pressed = Some(pressed);
-            } else {
             }
         }
     }

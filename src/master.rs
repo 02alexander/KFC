@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use cortex_m::delay::Delay;
-use embedded_hal::{digital::v2::OutputPin, timer::CountDown};
+use embedded_hal::timer::CountDown;
 use fugit::{ExtU32, RateExtU32};
 // use panic_probe as _;
 
@@ -33,7 +33,6 @@ use crate::{
     buttonmatrix::ButtonMatrix,
     comms::ComLink,
     encoding::decode,
-    hardware::{self, serial::println},
     layout::KeyboardLogic,
 };
 
@@ -187,8 +186,10 @@ pub fn run() -> ! {
                 let mut actions = Vec::with_capacity(8);
                 kblogic.update(&tot_pressed, &timer, &mut holds, &mut actions);
                 for pressed in actions {
-
-                    keyboard.device().write_report(pressed.iter().copied().chain(holds.iter().copied())).ok();
+                    keyboard
+                        .device()
+                        .write_report(pressed.iter().copied().chain(holds.iter().copied()))
+                        .ok();
                 }
                 // while !actions.is_empty() {
                 //     let action = actions.pop();

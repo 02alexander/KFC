@@ -4,7 +4,6 @@ use embedded_hal::{
 };
 use rp_pico::hal::uart::{Enabled, UartDevice, UartPeripheral, ValidUartPinout};
 
-
 pub struct ComLink<const N: usize, CD> {
     buffer: [u8; N],
     recvd: usize,
@@ -12,7 +11,7 @@ pub struct ComLink<const N: usize, CD> {
     request_countdown: CD,
 }
 
-impl<'a, const N: usize, CD> ComLink<N, CD>
+impl<const N: usize, CD> ComLink<N, CD>
 where
     CD: CountDown,
 {
@@ -33,7 +32,7 @@ where
         if self.request_countdown.wait().is_ok() {
             if self.is_waiting {
                 // Clear input of leftover input.
-                let mut trash_bin = [0 as u8; 8];
+                let mut trash_bin = [0; 8];
                 uart.read_raw(&mut trash_bin).ok()?;
                 self.recvd = 0;
             }

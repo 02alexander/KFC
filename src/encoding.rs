@@ -1,5 +1,5 @@
 pub fn encode(state: &[[bool; 6]; 5]) -> [u8; 4] {
-    let mut encoded = [0 as u8; 4];
+    let mut encoded = [0; 4];
     let mut flattened = [false; 6 * 5];
     for ri in 0..5 {
         for ci in 0..6 {
@@ -26,7 +26,7 @@ pub fn decode(encoded: &[u8; 4], state: &mut [[bool; 6]; 5]) {
                 flattened[i * 8 + offset] = true;
             }
             offset += 1;
-            byte = byte >> 1;
+            byte >>= 1;
         }
     }
     for ri in 0..5 {
